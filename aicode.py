@@ -26,25 +26,25 @@ from sklearn.ensemble import AdaBoostClassifier
 from sklearn.svm import SVC
 from sklearn.model_selection import GridSearchCV
 
-ROOT_DIR = "C:/Users/shc/Downloads/LGdata"
+ROOT_DIR = "C:/Users/shc/Downloads/LGdata" # 이 안에 train, test, submission csv 데이터 전부 넣어 사용
 RANDOM_STATE = 110
 
-# Load data
+# train.csv 불러옴
 train_data = pd.read_csv(os.path.join(ROOT_DIR, "train.csv"))
 train_data
 column_to_modify = "HEAD NORMAL COORDINATE X AXIS(Stage1) Collect Result_Dam"
 train_data[column_to_modify].replace("OK", np.nan, inplace=True)
 
-df_org_train, df_val = train_test_split(
+df_org_train, df_val = train_test_split( # train과 val을 언더샘플링 전에 미리 나눠둠(val data를 test data처럼 unbalance한 상태 유지, train data만 언더샘플링 하기 위함)
     train_data,
     test_size=0.3,
     stratify=train_data["target"],
     random_state=RANDOM_STATE,
 )
 
-normal_ratio = 1.0  # 1.0 means 1:1 ratio
+normal_ratio = 1.0  # 1.0 means 1:1 ratio, 언더샘플링 과정
 # Define normal_ratios to test
-normal_ratios = [0.5, 1.0, 2.0, 3.0, 4.0, 5.0]
+
 df_normal = df_org_train[df_org_train["target"] == "Normal"]
 df_abnormal = df_org_train[df_org_train["target"] == "AbNormal"]
 
@@ -70,9 +70,10 @@ print(f"  \tAbnormal\tNormal")
 print_stats(df_train)
 print_stats(df_val)
 
+# 모델 지정, 파리미터 수정
 model = CatBoostClassifier(
     random_seed=RANDOM_STATE,
-    verbose=False           # 학습 과정의 출력을 줄이기 위함
+    verbose=False           
 )
 
 features = []
@@ -84,6 +85,8 @@ for col in df_train.columns:
         features.append(col)
     except:
         continue
+        
+#혼동행렬 및 precision, recall, f1score 등의 결과를 나타내기 위함
 def print_metrics(y_true, y_pred, dataset_name):
     print(f"Metrics for {dataset_name} dataset:")
     print("Confusion Matrix:")
@@ -96,18 +99,24 @@ def print_metrics(y_true, y_pred, dataset_name):
 # Train dataset metrics
 train_x = df_train[features]
 train_y = df_train["target"]
-smote = SMOTE(random_state=RANDOM_STATE)
+#오버샘플링 과정, Normal과 Abnormal의 개수 맞춰줌
+smote = SMOTE(random_state=RANDOM_STATE) 
 train_x,train_y = smote.fit_resample(train_x,train_y)
 
-model.fit(train_x, train_y)
+#모델 학습
+model.fit(train_x, train_y) 
 
+#예측값 뽑아냄
 train_y_pred = model.predict(train_x)
+
+#실제 타겟과 예측값으로 성능지표 측정
 print_metrics(train_y, train_y_pred, "Training")
 
 # Validation dataset metrics
 val_x = df_val[features]
 val_y = df_val["target"]
 
+#검증데이터로 예측 및 성능지표 측정정
 val_y_pred = model.predict(val_x)
 print_metrics(val_y, val_y_pred, "Validation")
 
@@ -124,7 +133,7 @@ for col in df_test_x.columns:
         df_test_x.loc[:, col] = df_test_x[col].astype(int)
     except:
         continue
-
+#학습한 모델로 예측
 test_pred = model.predict(df_test_x)
 test_pred
 
